@@ -1,0 +1,300 @@
+---
+title: "Covid_19 Tracker"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    social: ["twitter", "facebook", "menu"]
+    source_code: embed
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(knitr)
+library(DT)
+library(rpivotTable)
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(openintro)
+library(highcharter)
+library(ggvis)
+
+library("tidyverse")
+library('purrr')
+library('readr')
+
+options(stringsAsFactors = FALSE);
+```
+
+```{r}
+url <- 'https://covid19.who.int/WHO-COVID-19-global-data.csv'
+data <- read_csv(url)
+dta <- data[complete.cases(data), ]
+data <- data %>% arrange(Date_reported, Country_code)
+```
+
+```{r}
+myColors <- c("blue", "#FFC125", "darkgreen", "darkorange")
+```
+
+
+Interactive Covid_19 Data Visualization
+==============================================
+
+Row
+-----------------------------------------------
+
+
+
+### Total cases so far in US
+```{r}
+valueBox(filter(data, Country_code == "US") %>% select(New_cases) %>% sum(),
+         icon = 'fa-building')
+```
+
+### Total Deaths in US so far
+
+```{r}
+valueBox(filter(data, Country_code == "US") %>% select(New_deaths) %>% sum(),
+         icon = 'fa-building')
+```
+
+
+
+### Total Cases in INDIA
+```{r}
+valueBox(filter(data, Country_code == "IN") %>% select(New_cases) %>% sum(),
+         icon = 'fa-building')
+```
+
+### Total Cases in BRAZIL
+```{r}
+valueBox(filter(data, Country_code == "BR") %>% select(New_cases) %>% sum(),
+         icon = 'fa-building')
+```
+
+
+
+Row
+-----------------------------------------------------
+
+
+### Total cases by Countries with more than 100,000 cases
+
+```{r}
+p1 <- data %>% group_by(Country) %>% 
+    summarize(Total=sum(New_cases)) %>%
+    filter(Total > 100000) %>%
+    plot_ly(x = ~Country,
+            y = ~Total,
+            color = rainbow(35),
+            type = 'bar') %>%
+layout(xaxis = list(title = "Total cases by Country"),
+       yaxis = list(title = 'Total number of cases'))
+p1
+```
+
+### Top Countries with more than 10,000 Total Deaths
+
+```{r}
+p1 <- data %>% group_by(Country) %>% 
+    summarize(Total=sum(New_deaths)) %>%
+    filter(Total > 10000) %>%
+    plot_ly(x = ~Country,
+            y = ~Total,
+            color = rainbow(16),
+            type = 'bar') %>%
+layout(xaxis = list(title = "Total Deaths by Country"),
+       yaxis = list(title = 'Total number of Deaths'))
+p1
+```
+
+
+### Top Countries with more than 100 Average Daily Deaths 
+```{r}
+p3 <- data %>% group_by(Country) %>% 
+    summarize(mean=mean(New_deaths)) %>%
+    filter(mean > 100) %>%
+    plot_ly(labels = ~Country,
+            values = ~mean,
+            marker = list(colors = myColors)) %>%
+            add_pie(hole=0.3) %>%
+layout(xaxis = list(zeroline = F,
+                    showline = F,
+                    showticklabels = F,
+                    showgrid = F),
+       yaxis = list(zeroline = F,
+                    showline = F,
+                    showticklabels = F,
+                    showgrid = F))
+
+p3
+```
+
+
+### Top Countries with Case Fatality Rate (CFR) at least more than 10%
+```{r}
+p4 <- data %>% group_by(Country) %>% 
+    summarize(CFR=round(sum(New_deaths)*100/sum(New_cases)), digits = 2) %>%
+    filter(CFR >=10) %>%
+    plot_ly(labels = ~Country,
+            values = ~CFR,
+            marker = list(colors = myColors)) %>%
+            add_pie(hole=0.3) %>%
+layout(xaxis = list(zeroline = F,
+                    showline = F,
+                    showticklabels = F,
+                    showgrid = F),
+       yaxis = list(zeroline = F,
+                    showline = F,
+                    showticklabels = F,
+                    showgrid = F))
+
+p4
+```
+
+
+
+Map
+===========================================================
+
+### Map
+```{r}
+Cumulative_deaths <- filter(data, Date_reported==data$Date_reported[nrow(data)]) 
+highchart() %>% hc_title(text = "Total deaths by Country") %>%
+                hc_subtitle(text = "source: WHO-COVID-19-global-data.csv" ) %>%
+                hc_add_series_map(worldgeojson, Cumulative_deaths,
+                                  name = "Country",
+                                  value = "Cumulative_deaths",
+                                  joinBy = c("woename", "Country")) %>%
+                hc_mapNavigation((enabled = T))
+```
+
+
+Data Table
+===============================================================
+
+```{r}
+datatable(data, 
+          caption = "WHO Covid_19 Data",
+          rownames = T,
+          filter = "top",
+          options = list(pageLength = 25))
+
+```
+
+
+
+Pivot Table
+====================================================================
+
+```{r}
+rpivotTable(data,
+             aggregatorName = "Last",
+             rows = "Date_reported",
+             cols = "Country",
+             rendererName = "Heatmap")
+```
+
+
+Summary {data-orientation=columns}
+=============================================================
+
+Column
+-------------------------------------------------------------
+
+
+
+### Total number of Covid_19 cases in the world so far
+```{r}
+
+valueBox(filter(data, Date_reported==data$Date_reported[nrow(data)]) %>% select(Cumulative_cases) %>% sum(),
+        icon = "fa-user")
+```
+
+
+
+### Total number of Deaths in the world so far
+```{r}
+
+valueBox(filter(data, Date_reported==data$Date_reported[nrow(data)]) %>% select(Cumulative_deaths) %>% sum(),
+        icon = "fa-user")
+```
+
+### Total number of cases in WHO Western Pacific Region (WPRO)
+```{r}
+
+valueBox(filter(data, WHO_region=="WPRO") %>% select(New_cases) %>% sum(),
+        icon = "fa-user")
+```
+
+### Total number of cases in WHO South East Asian Region (SEARO)
+```{r}
+
+valueBox(filter(data, WHO_region=="SEARO") %>% select(New_cases) %>% sum(),
+        icon = "fa-user")
+```
+
+### Total number of cases in WHO American Region (AMRO)
+```{r}
+
+valueBox(filter(data, WHO_region=="AMRO") %>% select(New_cases) %>% sum(),
+        icon = "fa-user")
+```
+
+### Total number of cases in WHO Europe Region (EURO)
+```{r}
+
+valueBox(filter(data, WHO_region=="EURO") %>% select(New_cases) %>% sum(),
+        icon = "fa-user")
+```
+
+### Total number of cases in WHO African Region (AFRO)
+```{r}
+
+valueBox(filter(data, WHO_region=="AFRO") %>% select(New_cases) %>% sum(),
+        icon = "fa-user")
+```
+
+### Total number of cases in WHO Eastern Mediterranean Region (EMRO)
+```{r}
+
+valueBox(filter(data, WHO_region=="EMRO") %>% select(New_cases) %>% sum(),
+        icon = "fa-user")
+```
+
+### Total number of cases in WHO OtherRegion (Other)
+```{r}
+
+valueBox(filter(data, WHO_region=="Other") %>% select(New_cases) %>% sum(),
+        icon = "fa-user")
+```
+
+
+Column
+---------------------------------------------
+Report
+
+* Top 5 countries in terms of total number of cases: 
+```{r}
+filter(data, Date_reported == '2020-09-19') %>% top_n(5, Cumulative_cases)
+
+```
+
+* Top 5 countries in terms of total number of deaths: 
+```{r}
+filter(data, Date_reported == '2020-09-19') %>% top_n(5, Cumulative_deaths)
+
+```
+
+* Countries with more than 10% of Case Fatality Rate (CFR) are:
+```{r}
+data %>% group_by(Country) %>% 
+    summarize(CFR=sum(New_deaths)*100/sum(New_cases)) %>%
+    filter(CFR > 10)
+```
+About Report
+==================================================================
+
+Created By: Sanjeeva Reddy Dodlapati
